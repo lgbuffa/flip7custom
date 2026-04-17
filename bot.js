@@ -51,6 +51,10 @@ function userName(user) {
   return user.first_name || user.username || `id:${user.id}`;
 }
 
+function escapeMd(text) {
+  return text.replace(/[_*`[]/g, '\\$&');
+}
+
 function extractUrl(output) {
   const aliasLine = output.split('\n').find((l) => /aliased:/i.test(l));
   if (aliasLine) {
@@ -166,7 +170,7 @@ Sempre use a ferramenta "aplicar_alteracao" para retornar o resultado.`,
 
     await bot.sendMessage(
       chatId,
-      `📋 *Entendimento da alteração:*\n\n${result.description}\n\nDeseja confirmar?`,
+      `📋 *Entendimento da alteração:*\n\n${escapeMd(result.description)}\n\nDeseja confirmar?`,
       {
         parse_mode: 'Markdown',
         reply_markup: {
@@ -318,7 +322,7 @@ bot.on('callback_query', async (query) => {
 
       await bot.sendMessage(
         chatId,
-        `✅ *Alteração aplicada com sucesso!*\n\n👤 Solicitante: ${userName(change.user)}\n📝 ${change.description}\n\n🔗 ${deployUrl}`,
+        `✅ *Alteração aplicada com sucesso!*\n\n👤 Solicitante: ${escapeMd(userName(change.user))}\n📝 ${escapeMd(change.description)}\n\n🔗 ${deployUrl}`,
         { parse_mode: 'Markdown' }
       );
     } catch (err) {
