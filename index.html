@@ -432,7 +432,7 @@
         <th>Total</th>
       </tr>`;
 
-      const sorted = players.map((p, pi) => ({ p, pi })).sort((a, b) => tot[b.pi] - tot[a.pi]);
+      const sorted = players.map((p, pi) => ({ p, pi }));
       body.innerHTML = sorted.map(({ p, pi }) => {
         const isWinner = tot[pi] > WINNING_SCORE;
         return `<tr class="${isWinner ? 'winner-row' : ''}">
