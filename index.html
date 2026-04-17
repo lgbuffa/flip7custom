@@ -229,6 +229,116 @@
       text-align: center;
       margin-top: 8px;
     }
+
+    /* Starter banner inside round card */
+    .starter-banner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: #0f172a;
+      border: 1px solid #f59e0b;
+      border-radius: 10px;
+      padding: 8px 14px;
+      margin-bottom: 12px;
+      font-size: 0.9rem;
+      color: #f59e0b;
+      font-weight: 700;
+    }
+
+    .starter-banner span.label {
+      color: #94a3b8;
+      font-weight: 400;
+      font-size: 0.8rem;
+    }
+
+    /* Starter badge na lista de jogadores */
+    .starter-badge-list {
+      display: inline-block;
+      background: #f59e0b;
+      color: #0f172a;
+      border-radius: 5px;
+      padding: 1px 6px;
+      font-size: 0.65rem;
+      font-weight: 800;
+      margin-left: 4px;
+      vertical-align: middle;
+    }
+
+    /* Player list item com reordenação */
+    .player-item {
+      background: #0f172a;
+      border-radius: 8px;
+      padding: 6px 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+    }
+
+    .player-item .pname {
+      flex: 1;
+      font-size: 0.95rem;
+    }
+
+    .player-item .order-btn {
+      background: #1e293b;
+      color: #94a3b8;
+      border: none;
+      border-radius: 6px;
+      padding: 3px 7px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .player-item .order-btn:active { opacity: 0.7; }
+
+    .player-item .remove-btn {
+      cursor: pointer;
+      color: #ef4444;
+      font-weight: bold;
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    #playerList {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 12px;
+    }
+
+    .order-hint {
+      color: #475569;
+      font-size: 0.75rem;
+      margin-top: 6px;
+    }
+
+    /* Toast para próximo iniciador */
+    .next-starter-toast {
+      display: none;
+      background: #1e3a5f;
+      border: 1px solid #3b82f6;
+      border-radius: 10px;
+      padding: 10px 14px;
+      margin-top: 10px;
+      text-align: center;
+      font-size: 0.88rem;
+      color: #93c5fd;
+    }
+
+    .next-starter-toast.show { display: block; }
+    .next-starter-toast strong { color: #ffffff; }
+
+    /* Ordem na mesa */
+    .table-order-hint {
+      color: #475569;
+      font-size: 0.75rem;
+      text-align: center;
+      margin-top: 4px;
+    }
   </style>
 </head>
 <body>
@@ -243,11 +353,13 @@
   <!-- Cadastro de jogadores -->
   <div class="card" id="setupCard">
     <h2>Jogadores</h2>
+    <p class="order-hint" style="margin-bottom:8px;">Adicione os jogadores na ordem em que estão sentados na mesa (sentido horário).</p>
     <div class="input-row">
       <input type="text" id="playerName" placeholder="Nome do jogador" maxlength="20" />
       <button onclick="addPlayer()">+</button>
     </div>
-    <div id="playerList" style="margin-top:12px; display:flex; flex-wrap:wrap; gap:8px;"></div>
+    <div id="playerList"></div>
+    <p class="order-hint">Use ↑ ↓ para ajustar a ordem dos jogadores na mesa.</p>
     <div class="btn-row">
       <button onclick="startGame()" id="startBtn" style="display:none">Iniciar Jogo</button>
     </div>
@@ -257,11 +369,17 @@
   <div class="card" id="roundCard" style="display:none">
     <h2>Registrar Rodada</h2>
     <div class="round-label" id="roundLabel">Rodada 1</div>
+    <div class="starter-banner" id="starterBanner">
+      <span class="label">Inicia a rodada:</span>
+      <span id="starterName">—</span>
+      🎯
+    </div>
     <div class="round-inputs" id="roundInputs"></div>
     <div class="btn-row">
       <button onclick="submitRound()">Confirmar Rodada</button>
       <button class="secondary" onclick="clearRoundInputs()">Limpar</button>
     </div>
+    <div class="next-starter-toast" id="nextStarterToast"></div>
   </div>
 
   <!-- Placar -->
@@ -280,17 +398,17 @@
   </div>
 
   <script>
-    let players = [];
-    let rounds = [];       // rounds[r][p] = pontos do jogador p na rodada r
-    let currentPlayerIdx = 0; // índice do jogador cuja vez é agora
+    let players = [];   // ordem dos jogadores na mesa
+    let rounds = [];    // cada rodada: array de pontos por índice de jogador
     let gameStarted = false;
+    let starterIndex = 0;  // índice em players de quem inicia a rodada atual
     const WINNING_SCORE = 200;
     const STORAGE_KEY = 'flip7custom_state';
 
     // ---- Persistence ----
 
     function saveState() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ players, rounds, currentPlayerIdx, gameStarted }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ players, rounds, gameStarted, starterIndex }));
     }
 
     function loadState() {
@@ -300,8 +418,8 @@
         const state = JSON.parse(raw);
         players = state.players || [];
         rounds = state.rounds || [];
-        currentPlayerIdx = state.currentPlayerIdx || 0;
         gameStarted = state.gameStarted || false;
+        starterIndex = state.starterIndex ?? 0;
         return true;
       } catch { return false; }
     }
@@ -330,20 +448,33 @@
       renderPlayerList();
     }
 
+    function movePlayer(idx, dir) {
+      // dir = -1 (subir) ou +1 (descer)
+      const newIdx = idx + dir;
+      if (newIdx < 0 || newIdx >= players.length) return;
+      [players[idx], players[newIdx]] = [players[newIdx], players[idx]];
+      renderPlayerList();
+    }
+
     function renderPlayerList() {
       const list = document.getElementById('playerList');
       list.innerHTML = players.map((p, i) => `
-        <span style="background:#0f172a;border-radius:8px;padding:6px 10px;display:flex;align-items:center;gap:6px;">
-          ${p}
-          <span onclick="removePlayer(${i})" style="cursor:pointer;color:#ef4444;font-weight:bold;">×</span>
-        </span>
+        <div class="player-item">
+          <span class="pname">
+            <span style="color:#475569;font-size:0.8rem;margin-right:4px;">${i + 1}.</span>
+            ${p}
+          </span>
+          <button class="order-btn" onclick="movePlayer(${i}, -1)" ${i === 0 ? 'disabled style="opacity:0.3"' : ''}>↑</button>
+          <button class="order-btn" onclick="movePlayer(${i}, 1)" ${i === players.length - 1 ? 'disabled style="opacity:0.3"' : ''}>↓</button>
+          <span class="remove-btn" onclick="removePlayer(${i})">×</span>
+        </div>
       `).join('');
       document.getElementById('startBtn').style.display = players.length >= 2 ? 'inline-block' : 'none';
     }
 
     function startGame() {
       gameStarted = true;
-      currentPlayerIdx = 0;
+      starterIndex = 0; // o primeiro da lista começa
       showGameUI();
       saveState();
     }
@@ -357,47 +488,84 @@
       checkWinner();
     }
 
-    // ---- Rounds ----
+    // ---- Starter control ----
 
-    function currentRoundNum() {
-      // Quantas rodadas completas (todos os jogadores já jogaram)
-      return Math.floor((rounds.length) / players.length) + 1;
+    function getStarterName() {
+      return players[starterIndex] || '—';
     }
+
+    function advanceStarter() {
+      // Próximo iniciador: índice à esquerda de quem iniciou
+      // "Esquerdo" numa mesa no sentido horário = índice anterior (circular)
+      starterIndex = (starterIndex + 1) % players.length;
+    }
+
+    function updateStarterBanner() {
+      document.getElementById('starterName').textContent = getStarterName();
+    }
+
+    // ---- Rounds ----
 
     function buildRoundInputs() {
       const container = document.getElementById('roundInputs');
-      const player = players[currentPlayerIdx];
-      document.getElementById('roundLabel').textContent =
-        `Rodada ${currentRoundNum()} — Vez de ${player}`;
-      container.innerHTML = `
+      const roundNum = rounds.length + 1;
+      document.getElementById('roundLabel').textContent = `Rodada ${roundNum}`;
+      updateStarterBanner();
+
+      // Montar inputs começando pelo iniciador (ordem de jogo)
+      const orderedIndices = [];
+      for (let i = 0; i < players.length; i++) {
+        orderedIndices.push((starterIndex + i) % players.length);
+      }
+
+      container.innerHTML = orderedIndices.map((pi, seq) => `
         <div class="round-player-row">
-          <label style="font-weight:700;font-size:1.1rem;color:#f1f5f9;">${player}</label>
-          <input type="number" id="pts_current" placeholder="pts" min="0" inputmode="numeric" />
-        </div>`;
-      document.getElementById('pts_current')?.focus();
+          <label>
+            ${seq === 0 ? '🎯 ' : ''}<strong>${players[pi]}</strong>
+            ${seq === 0 ? '<span style="color:#f59e0b;font-size:0.75rem;margin-left:4px;">(inicia)</span>' : ''}
+          </label>
+          <input type="number" id="pts_${pi}" placeholder="pts" min="0" inputmode="numeric" />
+        </div>
+      `).join('');
+
+      // Hide toast
+      document.getElementById('nextStarterToast').classList.remove('show');
+
+      document.getElementById(`pts_${starterIndex}`)?.focus();
     }
 
     function clearRoundInputs() {
-      const el = document.getElementById('pts_current');
-      if (el) { el.value = ''; el.focus(); }
+      players.forEach((_, i) => {
+        const el = document.getElementById(`pts_${i}`);
+        if (el) el.value = '';
+      });
+      document.getElementById(`pts_${starterIndex}`)?.focus();
     }
 
     function submitRound() {
-      const el = document.getElementById('pts_current');
-      const val = parseInt(el?.value);
-      const pts = isNaN(val) ? 0 : val;
+      const pts = players.map((_, i) => {
+        const el = document.getElementById(`pts_${i}`);
+        const val = parseInt(el?.value);
+        return isNaN(val) ? 0 : val;
+      });
+      rounds.push(pts);
 
-      // Abre nova linha de rodada quando for o primeiro jogador da vez
-      if (currentPlayerIdx === 0) {
-        rounds.push(new Array(players.length).fill(0));
-      }
-      rounds[rounds.length - 1][currentPlayerIdx] = pts;
+      // Calcular próximo iniciador ANTES de avançar (para mostrar no toast)
+      const currentStarter = getStarterName();
+      advanceStarter();
+      const nextStarter = getStarterName();
 
-      currentPlayerIdx = (currentPlayerIdx + 1) % players.length;
       saveState();
-      buildRoundInputs();
       renderScoreboard();
-      checkWinner();
+
+      const hasWinner = checkWinner();
+      if (!hasWinner) {
+        buildRoundInputs();
+        // Mostrar toast com próximo iniciador
+        const toast = document.getElementById('nextStarterToast');
+        toast.innerHTML = `✅ Rodada ${rounds.length} registrada! &nbsp;|&nbsp; Próxima rodada inicia: <strong>${nextStarter}</strong> 🎯`;
+        toast.classList.add('show');
+      }
     }
 
     // ---- Inline edit ----
@@ -443,11 +611,16 @@
         <th>Total</th>
       </tr>`;
 
-      const sorted = players.map((p, pi) => ({ p, pi }));
+      const sorted = players.map((p, pi) => ({ p, pi })).sort((a, b) => tot[b.pi] - tot[a.pi]);
       body.innerHTML = sorted.map(({ p, pi }) => {
-        const isWinner = tot[pi] > WINNING_SCORE;
+        const isWinner = tot[pi] >= WINNING_SCORE;
+        const isCurrentStarter = pi === starterIndex;
         return `<tr class="${isWinner ? 'winner-row' : ''}">
-          <td>${p}${isWinner ? '<span class="winner-badge">WIN</span>' : ''}</td>
+          <td>
+            ${p}
+            ${isWinner ? '<span class="winner-badge">WIN</span>' : ''}
+            ${!isWinner && isCurrentStarter ? '<span style="font-size:0.7rem;margin-left:4px;">🎯</span>' : ''}
+          </td>
           ${rounds.map((r, ri) => `<td class="editable" data-round="${ri}" data-player="${pi}">${r[pi] ?? 0}</td>`).join('')}
           <td class="total-col">${tot[pi]}</td>
         </tr>`;
@@ -460,21 +633,25 @@
       });
     }
 
+    // Retorna true se houver vencedor
     function checkWinner() {
       const tot = totals();
       const maxScore = Math.max(...tot);
       const banner = document.getElementById('winnerBanner');
       const roundCard = document.getElementById('roundCard');
 
-      if (maxScore > WINNING_SCORE) {
+      if (maxScore >= WINNING_SCORE) {
+        // Pode haver mais de um com >= 200; mostra o de maior pontuação (ou o primeiro em caso de empate)
         const winnerIdx = tot.indexOf(maxScore);
         document.getElementById('winnerName').textContent = players[winnerIdx];
         document.getElementById('winnerScore').textContent = `${maxScore} pontos`;
         banner.classList.add('show');
         roundCard.style.display = 'none';
+        return true;
       } else {
         banner.classList.remove('show');
         roundCard.style.display = 'block';
+        return false;
       }
     }
 
@@ -484,8 +661,8 @@
       if (!confirm('Zerar tudo e começar novo jogo?')) return;
       players = [];
       rounds = [];
-      currentPlayerIdx = 0;
       gameStarted = false;
+      starterIndex = 0;
       localStorage.removeItem(STORAGE_KEY);
       document.getElementById('winnerBanner').classList.remove('show');
       document.getElementById('setupCard').style.display = 'block';
