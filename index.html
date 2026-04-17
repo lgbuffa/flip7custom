@@ -281,7 +281,8 @@
 
   <script>
     let players = [];
-    let rounds = [];
+    let rounds = [];       // rounds[r][p] = pontos do jogador p na rodada r
+    let currentPlayerIdx = 0; // índice do jogador cuja vez é agora
     let gameStarted = false;
     const WINNING_SCORE = 200;
     const STORAGE_KEY = 'flip7custom_state';
@@ -289,7 +290,7 @@
     // ---- Persistence ----
 
     function saveState() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ players, rounds, gameStarted }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ players, rounds, currentPlayerIdx, gameStarted }));
     }
 
     function loadState() {
@@ -299,6 +300,7 @@
         const state = JSON.parse(raw);
         players = state.players || [];
         rounds = state.rounds || [];
+        currentPlayerIdx = state.currentPlayerIdx || 0;
         gameStarted = state.gameStarted || false;
         return true;
       } catch { return false; }
@@ -341,6 +343,7 @@
 
     function startGame() {
       gameStarted = true;
+      currentPlayerIdx = 0;
       showGameUI();
       saveState();
     }
@@ -356,33 +359,41 @@
 
     // ---- Rounds ----
 
+    function currentRoundNum() {
+      // Quantas rodadas completas (todos os jogadores já jogaram)
+      return Math.floor((rounds.length) / players.length) + 1;
+    }
+
     function buildRoundInputs() {
       const container = document.getElementById('roundInputs');
-      document.getElementById('roundLabel').textContent = `Rodada ${rounds.length + 1}`;
-      container.innerHTML = players.map((p, i) => `
+      const player = players[currentPlayerIdx];
+      document.getElementById('roundLabel').textContent =
+        `Rodada ${currentRoundNum()} — Vez de ${player}`;
+      container.innerHTML = `
         <div class="round-player-row">
-          <label>${p}</label>
-          <input type="number" id="pts_${i}" placeholder="pts" min="0" inputmode="numeric" />
-        </div>
-      `).join('');
-      document.getElementById('pts_0')?.focus();
+          <label style="font-weight:700;font-size:1.1rem;color:#f1f5f9;">${player}</label>
+          <input type="number" id="pts_current" placeholder="pts" min="0" inputmode="numeric" />
+        </div>`;
+      document.getElementById('pts_current')?.focus();
     }
 
     function clearRoundInputs() {
-      players.forEach((_, i) => {
-        const el = document.getElementById(`pts_${i}`);
-        if (el) el.value = '';
-      });
-      document.getElementById('pts_0')?.focus();
+      const el = document.getElementById('pts_current');
+      if (el) { el.value = ''; el.focus(); }
     }
 
     function submitRound() {
-      const pts = players.map((_, i) => {
-        const el = document.getElementById(`pts_${i}`);
-        const val = parseInt(el?.value);
-        return isNaN(val) ? 0 : val;
-      });
-      rounds.push(pts);
+      const el = document.getElementById('pts_current');
+      const val = parseInt(el?.value);
+      const pts = isNaN(val) ? 0 : val;
+
+      // Abre nova linha de rodada quando for o primeiro jogador da vez
+      if (currentPlayerIdx === 0) {
+        rounds.push(new Array(players.length).fill(0));
+      }
+      rounds[rounds.length - 1][currentPlayerIdx] = pts;
+
+      currentPlayerIdx = (currentPlayerIdx + 1) % players.length;
       saveState();
       buildRoundInputs();
       renderScoreboard();
@@ -473,6 +484,7 @@
       if (!confirm('Zerar tudo e começar novo jogo?')) return;
       players = [];
       rounds = [];
+      currentPlayerIdx = 0;
       gameStarted = false;
       localStorage.removeItem(STORAGE_KEY);
       document.getElementById('winnerBanner').classList.remove('show');
