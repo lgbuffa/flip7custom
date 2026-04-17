@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flip7Custom</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a;
+      color: #f1f5f9;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 2rem;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: 2px;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background: #1e293b;
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .card h2 {
+      font-size: 1rem;
+      color: #94a3b8;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    input[type="text"], input[type="number"] {
+      flex: 1;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: #f1f5f9;
+      font-size: 1rem;
+      outline: none;
+    }
+
+    input:focus { border-color: #f59e0b; }
+
+    button {
+      background: #f59e0b;
+      color: #0f172a;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 18px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    button:active { opacity: 0.8; }
+
+    button.secondary {
+      background: #334155;
+      color: #f1f5f9;
+    }
+
+    button.danger {
+      background: #ef4444;
+      color: #fff;
+    }
+
+    /* Scoreboard */
+    .scoreboard-wrap {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      min-width: 300px;
+    }
+
+    thead th {
+      background: #0f172a;
+      padding: 10px 8px;
+      text-align: center;
+      color: #94a3b8;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+    }
+
+    thead th:first-child { text-align: left; }
+
+    tbody tr:nth-child(even) { background: #162032; }
+
+    tbody td {
+      padding: 10px 8px;
+      text-align: center;
+      border-bottom: 1px solid #1e293b;
+      cursor: pointer;
+    }
+
+    tbody td:first-child {
+      text-align: left;
+      font-weight: 600;
+      cursor: default;
+    }
+
+    tbody td:last-child { cursor: default; }
+
+    td.editable:hover {
+      background: #1e3a5f;
+    }
+
+    td.editing {
+      padding: 2px 4px;
+    }
+
+    td.editing input {
+      width: 60px;
+      padding: 4px 6px;
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    .total-col {
+      font-weight: 800;
+      font-size: 1rem;
+      color: #f59e0b;
+    }
+
+    .winner-row td {
+      background: #422006 !important;
+      color: #fbbf24;
+    }
+
+    .winner-badge {
+      display: inline-block;
+      background: #f59e0b;
+      color: #0f172a;
+      border-radius: 6px;
+      padding: 1px 6px;
+      font-size: 0.7rem;
+      font-weight: 800;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+
+    /* Round input */
+    .round-inputs { display: flex; flex-direction: column; gap: 10px; }
+
+    .round-player-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .round-player-row label {
+      flex: 1;
+      font-size: 0.95rem;
+    }
+
+    .round-player-row input {
+      width: 90px;
+      flex: none;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+
+    .winner-banner {
+      display: none;
+      background: linear-gradient(135deg, #f59e0b, #ef4444);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+      margin-bottom: 16px;
+      animation: pulse 1s infinite alternate;
+    }
+
+    .winner-banner.show { display: block; }
+
+    .winner-banner h2 {
+      font-size: 1.5rem;
+      color: #0f172a;
+      font-weight: 900;
+    }
+
+    .winner-banner p {
+      color: #0f172a;
+      margin-top: 4px;
+      font-weight: 600;
+    }
+
+    @keyframes pulse {
+      from { transform: scale(1); }
+      to { transform: scale(1.02); }
+    }
+
+    .round-label {
+      color: #64748b;
+      font-size: 0.8rem;
+      text-align: center;
+      margin-bottom: 4px;
+    }
+
+    .edit-hint {
+      color: #475569;
+      font-size: 0.75rem;
+      text-align: center;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1 style="color: #ffffff;">🃏 Flip7Custom</h1>
+
+  <!-- Winner banner -->
+  <div class="winner-banner" id="winnerBanner">
+    <h2>🏆 <span id="winnerName"></span> VENCEU!</h2>
+    <p id="winnerScore"></p>
+  </div>
+
+  <!-- Cadastro de jogadores -->
+  <div class="card" id="setupCard">
+    <h2>Jogadores</h2>
+    <div class="input-row">
+      <input type="text" id="playerName" placeholder="Nome do jogador" maxlength="20" />
+      <button onclick="addPlayer()">+</button>
+    </div>
+    <div id="playerList" style="margin-top:12px; display:flex; flex-wrap:wrap; gap:8px;"></div>
+    <div class="btn-row">
+      <button onclick="startGame()" id="startBtn" style="display:none">Iniciar Jogo</button>
+    </div>
+  </div>
+
+  <!-- Registrar rodada -->
+  <div class="card" id="roundCard" style="display:none">
+    <h2>Registrar Rodada</h2>
+    <div class="round-label" id="roundLabel">Rodada 1</div>
+    <div class="round-inputs" id="roundInputs"></div>
+    <div class="btn-row">
+      <button onclick="submitRound()">Confirmar Rodada</button>
+      <button class="secondary" onclick="clearRoundInputs()">Limpar</button>
+    </div>
+  </div>
+
+  <!-- Placar -->
+  <div class="card" id="scoreCard" style="display:none">
+    <h2>Placar</h2>
+    <div class="scoreboard-wrap">
+      <table id="scoreTable">
+        <thead id="scoreHead"></thead>
+        <tbody id="scoreBody"></tbody>
+      </table>
+    </div>
+    <p class="edit-hint">Toque em um valor para editar</p>
+    <div class="btn-row" style="margin-top:16px">
+      <button class="danger" onclick="resetGame()">Novo Jogo</button>
+    </div>
+  </div>
+
+  <script>
+    let players = [];
+    let rounds = [];
+    let gameStarted = false;
+    const WINNING_SCORE = 200;
+    const STORAGE_KEY = 'flip7custom_state';
+
+    // ---- Persistence ----
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ players, rounds, gameStarted }));
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return false;
+        const state = JSON.parse(raw);
+        players = state.players || [];
+        rounds = state.rounds || [];
+        gameStarted = state.gameStarted || false;
+        return true;
+      } catch { return false; }
+    }
+
+    // ---- Setup ----
+
+    function addPlayer() {
+      const input = document.getElementById('playerName');
+      const name = input.value.trim();
+      if (!name) return;
+      if (players.find(p => p.toLowerCase() === name.toLowerCase())) {
+        alert('Jogador já cadastrado.');
+        return;
+      }
+      players.push(name);
+      input.value = '';
+      renderPlayerList();
+    }
+
+    document.getElementById('playerName').addEventListener('keydown', e => {
+      if (e.key === 'Enter') addPlayer();
+    });
+
+    function removePlayer(idx) {
+      players.splice(idx, 1);
+      renderPlayerList();
+    }
+
+    function renderPlayerList() {
+      const list = document.getElementById('playerList');
+      list.innerHTML = players.map((p, i) => `
+        <span style="background:#0f172a;border-radius:8px;padding:6px 10px;display:flex;align-items:center;gap:6px;">
+          ${p}
+          <span onclick="removePlayer(${i})" style="cursor:pointer;color:#ef4444;font-weight:bold;">×</span>
+        </span>
+      `).join('');
+      document.getElementById('startBtn').style.display = players.length >= 2 ? 'inline-block' : 'none';
+    }
+
+    function startGame() {
+      gameStarted = true;
+      showGameUI();
+      saveState();
+    }
+
+    function showGameUI() {
+      document.getElementById('setupCard').style.display = 'none';
+      document.getElementById('roundCard').style.display = 'block';
+      document.getElementById('scoreCard').style.display = 'block';
+      buildRoundInputs();
+      renderScoreboard();
+      checkWinner();
+    }
+
+    // ---- Rounds ----
+
+    function buildRoundInputs() {
+      const container = document.getElementById('roundInputs');
+      document.getElementById('roundLabel').textContent = `Rodada ${rounds.length + 1}`;
+      container.innerHTML = players.map((p, i) => `
+        <div class="round-player-row">
+          <label>${p}</label>
+          <input type="number" id="pts_${i}" placeholder="pts" min="0" inputmode="numeric" />
+        </div>
+      `).join('');
+      document.getElementById('pts_0')?.focus();
+    }
+
+    function clearRoundInputs() {
+      players.forEach((_, i) => {
+        const el = document.getElementById(`pts_${i}`);
+        if (el) el.value = '';
+      });
+      document.getElementById('pts_0')?.focus();
+    }
+
+    function submitRound() {
+      const pts = players.map((_, i) => {
+        const el = document.getElementById(`pts_${i}`);
+        const val = parseInt(el?.value);
+        return isNaN(val) ? 0 : val;
+      });
+      rounds.push(pts);
+      saveState();
+      buildRoundInputs();
+      renderScoreboard();
+      checkWinner();
+    }
+
+    // ---- Inline edit ----
+
+    function startEdit(td, roundIdx, playerIdx) {
+      if (td.classList.contains('editing')) return;
+      const current = rounds[roundIdx][playerIdx] ?? 0;
+      td.classList.add('editing');
+      td.innerHTML = `<input type="number" inputmode="numeric" value="${current}" style="width:60px;padding:4px 6px;font-size:0.9rem;text-align:center;" />`;
+      const input = td.querySelector('input');
+      input.focus();
+      input.select();
+
+      function commit() {
+        const val = parseInt(input.value);
+        rounds[roundIdx][playerIdx] = isNaN(val) ? 0 : val;
+        saveState();
+        renderScoreboard();
+        checkWinner();
+      }
+
+      input.addEventListener('blur', commit);
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { input.blur(); }
+        if (e.key === 'Escape') { td.classList.remove('editing'); renderScoreboard(); }
+      });
+    }
+
+    // ---- Scoreboard ----
+
+    function totals() {
+      return players.map((_, pi) => rounds.reduce((sum, r) => sum + (r[pi] || 0), 0));
+    }
+
+    function renderScoreboard() {
+      const head = document.getElementById('scoreHead');
+      const body = document.getElementById('scoreBody');
+      const tot = totals();
+
+      head.innerHTML = `<tr>
+        <th>Jogador</th>
+        ${rounds.map((_, i) => `<th>R${i + 1}</th>`).join('')}
+        <th>Total</th>
+      </tr>`;
+
+      const sorted = players.map((p, pi) => ({ p, pi })).sort((a, b) => tot[b.pi] - tot[a.pi]);
+      body.innerHTML = sorted.map(({ p, pi }) => {
+        const isWinner = tot[pi] > WINNING_SCORE;
+        return `<tr class="${isWinner ? 'winner-row' : ''}">
+          <td>${p}${isWinner ? '<span class="winner-badge">WIN</span>' : ''}</td>
+          ${rounds.map((r, ri) => `<td class="editable" data-round="${ri}" data-player="${pi}">${r[pi] ?? 0}</td>`).join('')}
+          <td class="total-col">${tot[pi]}</td>
+        </tr>`;
+      }).join('');
+
+      body.querySelectorAll('td.editable').forEach(td => {
+        td.addEventListener('click', () => {
+          startEdit(td, parseInt(td.dataset.round), parseInt(td.dataset.player));
+        });
+      });
+    }
+
+    function checkWinner() {
+      const tot = totals();
+      const maxScore = Math.max(...tot);
+      const banner = document.getElementById('winnerBanner');
+      const roundCard = document.getElementById('roundCard');
+
+      if (maxScore > WINNING_SCORE) {
+        const winnerIdx = tot.indexOf(maxScore);
+        document.getElementById('winnerName').textContent = players[winnerIdx];
+        document.getElementById('winnerScore').textContent = `${maxScore} pontos`;
+        banner.classList.add('show');
+        roundCard.style.display = 'none';
+      } else {
+        banner.classList.remove('show');
+        roundCard.style.display = 'block';
+      }
+    }
+
+    // ---- Reset ----
+
+    function resetGame() {
+      if (!confirm('Zerar tudo e começar novo jogo?')) return;
+      players = [];
+      rounds = [];
+      gameStarted = false;
+      localStorage.removeItem(STORAGE_KEY);
+      document.getElementById('winnerBanner').classList.remove('show');
+      document.getElementById('setupCard').style.display = 'block';
+      document.getElementById('roundCard').style.display = 'none';
+      document.getElementById('scoreCard').style.display = 'none';
+      document.getElementById('playerList').innerHTML = '';
+      document.getElementById('startBtn').style.display = 'none';
+    }
+
+    // ---- Boot ----
+
+    if (loadState() && gameStarted) {
+      showGameUI();
+    }
+  </script>
+</body>
+</html>
