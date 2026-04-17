@@ -300,7 +300,7 @@ bot.on('callback_query', async (query) => {
       log('📦', `Salvando alteração no Git...`);
       const gitName = process.env.GIT_USER_NAME || 'Flip7Custom Bot';
       const gitEmail = process.env.GIT_USER_EMAIL || 'bot@flip7custom.local';
-      const commitMsg = `bot: ${change.request.slice(0, 72)}`;
+      const commitMsg = `bot: ${change.request.replace(/\r?\n/g, ' ').slice(0, 72)}`;
       execSync(
         `git -c user.name="${gitName}" -c user.email="${gitEmail}" add index.html && ` +
         `git -c user.name="${gitName}" -c user.email="${gitEmail}" commit -m "${commitMsg.replace(/"/g, "'")}" && ` +
