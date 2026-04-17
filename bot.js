@@ -92,6 +92,59 @@ const domain = data.domains?.find((d) => !d.redirect);
   return domain ? `https://${domain.name}` : null;
 }
 
+// Faz commit de um arquivo via GitHub API (sem precisar do binário git)
+async function githubCommit(filePath, content, message) {
+  const token = process.env.GIT_TOKEN;
+  if (!token) { log('⚠️', 'GIT_TOKEN não definido — commit ignorado'); return; }
+
+  const repo = 'lgbuffa/flip7custom';
+  const branch = 'main';
+  const contentB64 = Buffer.from(content).toString('base64');
+
+  function ghRequest(method, path, body) {
+    return new Promise((resolve, reject) => {
+      const payload = JSON.stringify(body);
+      const options = {
+        hostname: 'api.github.com',
+        path,
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'User-Agent': 'flip7custom-bot',
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+        },
+      };
+      const req = https.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => (data += chunk));
+        res.on('end', () => {
+          try { resolve(JSON.parse(data)); }
+          catch (e) { reject(e); }
+        });
+      });
+      req.on('error', reject);
+      req.write(payload);
+      req.end();
+    });
+  }
+
+  // Busca o SHA atual do arquivo
+  const current = await ghRequest('GET', `/repos/${repo}/contents/${filePath}?ref=${branch}`, {});
+  const sha = current.sha;
+
+  await ghRequest('PUT', `/repos/${repo}/contents/${filePath}`, {
+    message,
+    content: contentB64,
+    sha,
+    branch,
+    committer: {
+      name: process.env.GIT_USER_NAME || 'Flip7Custom Bot',
+      email: process.env.GIT_USER_EMAIL || 'bot@flip7custom.local',
+    },
+  });
+}
+
 // Baixa arquivo do Telegram para disco
 function downloadFile(url, dest) {
   return new Promise((resolve, reject) => {
@@ -297,17 +350,10 @@ bot.on('callback_query', async (query) => {
       if (!deployUrl) deployUrl = extractUrl(deployOutput);
       log('🌐', `Deploy concluído: ${deployUrl}`);
 
-      log('📦', `Salvando alteração no Git...`);
-      const gitName = process.env.GIT_USER_NAME || 'Flip7Custom Bot';
-      const gitEmail = process.env.GIT_USER_EMAIL || 'bot@flip7custom.local';
+      log('📦', `Salvando alteração no GitHub...`);
       const commitMsg = `bot: ${change.request.replace(/\r?\n/g, ' ').slice(0, 72)}`;
-      execSync(
-        `git -c user.name="${gitName}" -c user.email="${gitEmail}" add index.html && ` +
-        `git -c user.name="${gitName}" -c user.email="${gitEmail}" commit -m "${commitMsg.replace(/"/g, "'")}" && ` +
-        `git push ${process.env.GIT_TOKEN ? `https://${process.env.GIT_TOKEN}@github.com/lgbuffa/flip7custom.git` : ''}`,
-        { cwd: __dirname, encoding: 'utf8' }
-      );
-      log('✅', `Git commit + push concluído`);
+      await githubCommit('index.html', change.modifiedHtml, commitMsg);
+      log('✅', `GitHub commit concluído`);
 
       saveLog({
         timestamp: new Date().toISOString(),
