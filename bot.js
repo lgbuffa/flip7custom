@@ -300,7 +300,7 @@ bot.on('callback_query', async (query) => {
       execSync(
         `git -c user.name="${gitName}" -c user.email="${gitEmail}" add index.html && ` +
         `git -c user.name="${gitName}" -c user.email="${gitEmail}" commit -m "${commitMsg.replace(/"/g, "'")}" && ` +
-        `git push`,
+        `git push ${process.env.GIT_TOKEN ? `https://${process.env.GIT_TOKEN}@github.com/lgbuffa/flip7custom.git` : ''}`,
         { cwd: __dirname, encoding: 'utf8' }
       );
       log('✅', `Git commit + push concluído`);
